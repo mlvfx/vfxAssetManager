@@ -1,4 +1,6 @@
 import os
+import imp
+import sys
 
 PROJECT_FOLDER = os.path.dirname(__file__)
 
@@ -21,8 +23,17 @@ class HostManager(object):
         # print plugins
 
         for p in plugins:
-            print p
+            try:
+                host_path = os.path.join(p, 'host.py').replace('\\', '/')
+                name, ext = os.path.splitext(host_path)
 
+                host = imp.load_source(name, host_path)
+
+            except IOError, ioe:
+                print 'IOError -- ', ioe
+
+            except ImportError, ime:
+                print 'ImportError -- ', ime
 
 def main(*args):
     hm = HostManager()
