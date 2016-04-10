@@ -124,7 +124,7 @@ class VFXAssetManager(QtGui.QMainWindow):
         Args:
             item(Asset): pass in an Asset object
         """
-        print item.get_path()
+        print item.get_path() 
         self.path_line.setText(item.get_path())
 
     def selected_asset_rightclicked(self, QPos):
