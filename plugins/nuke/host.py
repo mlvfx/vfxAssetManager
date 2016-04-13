@@ -6,7 +6,7 @@ import sys
 
 
 class HostApp(BaseHost):
-    ID = 'Maya'
+    ID = 'Nuke'
 
     def get_host(self):
-        return 'Maya' in sys.executable       
+        return 'Nuke' in sys.executable       

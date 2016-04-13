@@ -13,12 +13,21 @@ from PySide import QtGui
 import vfxAssetManager.ui.contact_sheet as contact_sheet
 reload(contact_sheet)
 
+import vfxAssetManager.ui.breadcrumb as breadcrumb
+reload(breadcrumb)
+
+import vfxAssetManager.host_manager as host_manager
+reload(host_manager)
+
 PROJECTS_FOLDER = 'G:/'
 PUBLISH_FOLDER = 'published'
 DEFAULT_PROJECT = 'EelCreek'
 
 
 class VFXAssetManager(QtGui.QMainWindow): 
+    HOST = None
+    ACTIONS = []
+
     def __init__(self, parent=None):
         super(VFXAssetManager, self).__init__(parent)
         self.setWindowTitle("VFX Asset Manager")
@@ -53,7 +62,7 @@ class VFXAssetManager(QtGui.QMainWindow):
 
         # Setup the assets vbox
         self.assets = self._asset_layout()     
-        self.breadcrumb = QBreadcrumb(parent=self.folder_tree_widget)
+        self.breadcrumb = breadcrumb.QBreadcrumb(parent=self.folder_tree_widget)
         self.assets.addWidget(self.breadcrumb)
         self.assets.addWidget(QtGui.QLabel('Assets:'))
         self.asset_list_widget = self._list_widget(parent=self.assets)     
@@ -136,12 +145,14 @@ class VFXAssetManager(QtGui.QMainWindow):
         """
         item = self.asset_list_widget.itemAt(QPos)
         if item is not None:
-            menu = QtGui.QMenu("Context Menu", self)
-            abc_import_action = QtGui.QAction('ABC Import', 
-                                              self, 
-                                              triggered=lambda: self.abc_import(item))
-            menu.addAction(abc_import_action)
-            ret = menu.exec_(self.asset_list_widget.mapToGlobal(QPos))
+            if item.get_actions():
+                menu = QtGui.QMenu("Context Menu", self)
+                for action in item.get_actions():
+                    qaction = QtGui.QAction(action.NAME, 
+                                            self, 
+                                            triggered=lambda: action.execute(item.get_path()))
+                    menu.addAction(qaction)
+                ret = menu.exec_(self.asset_list_widget.mapToGlobal(QPos))
 
     def get_projects(self, filepath):        
         projects = os.listdir(filepath)
@@ -192,12 +203,25 @@ class VFXAssetManager(QtGui.QMainWindow):
 
         for asset in self._get_files(item.get_path(), pattern='*.abc'):
             name = os.path.basename(asset)
-            if os.path.isfile(asset): 
-                self.asset_list_widget.addItem(Asset(None, name, asset))
+            if os.path.isfile(asset):
+                asset_obj = Asset(None, name, asset)
+                valid_actions = [a for a in self.ACTIONS if a.FILETYPE == asset_obj.FILETYPE]
+                asset_obj.add_actions(valid_actions)
+
+                self.asset_list_widget.addItem(asset_obj)
+
+        for asset in self._get_files(item.get_path(), pattern='*.vdb'):
+            name = os.path.basename(asset)
+            if os.path.isfile(asset):
+                asset_obj = Asset(None, name, asset)
+                valid_actions = [a for a in self.ACTIONS if a.FILETYPE == asset_obj.FILETYPE]
+                asset_obj.add_actions(valid_actions)
+
+                self.asset_list_widget.addItem(asset_obj)
 
         images = self._get_files(item.get_path(), pattern='*.png')
         images.sort()
-        self.texture_widget.load(images)            
+        # self.texture_widget.load(images)            
 
     def _populate_asset_info(self):
         self.current_locations['asset'] = self.asset_list_widget.currentItem().text() or ''
@@ -210,7 +234,7 @@ class VFXAssetManager(QtGui.QMainWindow):
     def _tree_widget(self, parent):
         tree_browser_widget = QtGui.QTreeWidget()
         tree_browser_widget.itemClicked.connect(self._populate_assets)
-        tree_browser_widget.itemSelectionChanged.connect(self.tester)
+        # tree_browser_widget.itemSelectionChanged.connect(self.tester)
         tree_browser_widget.setHeaderHidden(True)
         parent.addWidget(tree_browser_widget)
 
@@ -304,11 +328,17 @@ class Variant(QtGui.QTreeWidgetItem):
 
 
 class Asset(QtGui.QListWidgetItem):
+    FILETYPE = None
+    ACTIONS = []
+
     def __init__(self, parent, name, path):
         super(Asset, self).__init__(parent)
 
         self.setText(name)
         self._path = path.replace("\\","/")
+
+        name, ext = os.path.splitext(self._path)
+        self.FILETYPE = ext.replace('.', '')
 
     def get_name(self):
         return self.text()
@@ -316,14 +346,20 @@ class Asset(QtGui.QListWidgetItem):
     def get_path(self):
         return self._path 
 
-    def abc_import(self):
-        if HostApp.in_maya():
-            import maya.cmds as cmds
-            cmds.AbcImport(str(self.get_path()))
+    def get_actions(self):
+        return self.ACTIONS
 
-        if HostApp.in_clarisse():
-            import ix
-            ix.import_scene(str(self.get_path()))
+    def add_actions(self, actions):
+        self.ACTIONS = actions
+
+    # def abc_import(self):
+    #     if HostApp.in_maya():
+    #         import maya.cmds as cmds
+    #         cmds.AbcImport(str(self.get_path()))
+
+    #     if HostApp.in_clarisse():
+    #         import ix
+    #         ix.import_scene(str(self.get_path()))
 
 
 class HostApp(object):
@@ -364,89 +400,23 @@ class FolderHelper(object):
         return result
 
 
-class QBreadcrumb(QtGui.QWidget):
-    def __init__(self, parent=None):
-        super(QBreadcrumb, self).__init__(parent)        
-        self.parent = parent
-        self.layout = QtGui.QHBoxLayout(self)
-        self.layout.setSpacing(2)
-        m = 3
-        self.layout.setContentsMargins(m, m, m, m)
-        self.layout.setAlignment(QtCore.Qt.AlignTop)
-
-        self.buttons = []
-        self.dividers = []
-
-        num_of_buttons = 5
-        for value in range(num_of_buttons):
-            self._add_button()        
-
-    def set_breadcrumb_label(self, *args):
-        
-        button_activators = [args[-1]]
-        parent = args[-1].parent()
-        if parent:
-            button_activators.append(parent)
-            while parent.parent() is not None:
-                parent = parent.parent()
-                button_activators.append(parent)
-
-        if button_activators:
-            button_activators.reverse()
-            for idx, item in enumerate(button_activators):
-                self.buttons[idx].setText(item.get_name())
-                self.buttons[idx].setVisible(True)
-                self.dividers[idx].setVisible(True)
-                self.buttons[idx].clicked.connect(lambda: self._select_in_tree(item))
-
-    def _select_in_tree(self, item):
-        # print self.parent, item.get_name()
-        self.parent.setCurrentItem(item)
-
-    def _add_button(self):
-        button = QtGui.QPushButton('..')
-        button.setFixedWidth(70)
-        button.setVisible(False)
-        self.layout.addWidget(button)
-        self._add_divider()
-        self.buttons.append(button)
-
-    def _add_divider(self):
-        divider = QtGui.QLabel('>')
-        divider.setFixedWidth(8)
-        divider.setVisible(False)
-        self.layout.addWidget(divider)
-        self.dividers.append(divider)
-
-
 def main(*args):
     global vfx_asset_manager
+
+    hm = host_manager.HostManager()
+    host = hm.get_hostapp()
+    actions = hm.get_actions()
 
     try:
         vfx_asset_manager.close()
     except:
         pass
 
-    if HostApp.in_clarisse():
-        import pyqt_clarisse
-
-        try:
-            app = QtGui.QApplication(["Clarisse"])
-        except:
-            app = QtGui.QApplication.instance()
-
-        vfx_asset_manager = VFXAssetManager()
-        vfx_asset_manager.show()
-
-        pyqt_clarisse.exec_(app)
-
-    if HostApp.in_nuke():
-        vfx_asset_manager = VFXAssetManager()
-        vfx_asset_manager.show()
-
-    if HostApp.in_maya():
-        vfx_asset_manager = VFXAssetManager()
-        vfx_asset_manager.show()
+    host.start_QApp()
+    vfx_asset_manager = VFXAssetManager()
+    vfx_asset_manager.HOST = host
+    vfx_asset_manager.ACTIONS = actions
+    vfx_asset_manager.show()
 
     if HostApp.in_shell():
         app = QtGui.QApplication(sys.argv)

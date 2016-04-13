@@ -19,6 +19,8 @@ def find_plugins():
 class HostManager(object):
     def __init__(self):
         plugins = find_plugins()
+        self.host_app = None
+        self.host_actions = []
 
         # print plugins
 
@@ -28,6 +30,15 @@ class HostManager(object):
                 name, ext = os.path.splitext(host_path)
 
                 host = imp.load_source(name, host_path)
+                host_app = host.HostApp()
+
+                if host_app.INHOST:
+                    self.host_app = host_app
+                    action_path = os.path.join(p, 'actions.py').replace('\\', '/')
+                    name, ext = os.path.splitext(action_path)
+
+                    action = imp.load_source(name, action_path)
+                    self.host_actions = action.register_actions()
 
             except IOError, ioe:
                 print 'IOError -- ', ioe
@@ -35,8 +46,8 @@ class HostManager(object):
             except ImportError, ime:
                 print 'ImportError -- ', ime
 
-def main(*args):
-    hm = HostManager()
+    def get_hostapp(self):
+        return self.host_app
 
-if __name__ == '__main__':
-    main()
+    def get_actions(self):
+        return self.host_actions
