@@ -3,6 +3,7 @@ import os
 import inspect
 import fnmatch
 import pprint
+from functools import partial
 
 if not 'G:/Scripts/' in sys.path:
     sys.path.append('G:/Scripts/')
@@ -10,8 +11,8 @@ if not 'G:/Scripts/' in sys.path:
 from PySide import QtCore
 from PySide import QtGui
 
-import vfxAssetManager.ui.contact_sheet as contact_sheet
-reload(contact_sheet)
+# import vfxAssetManager.ui.contact_sheet as contact_sheet
+# reload(contact_sheet)
 
 import vfxAssetManager.ui.breadcrumb as breadcrumb
 reload(breadcrumb)
@@ -19,14 +20,19 @@ reload(breadcrumb)
 import vfxAssetManager.host_manager as host_manager
 reload(host_manager)
 
+from vfxAssetManager.base.constants import ActionType
+
 PROJECTS_FOLDER = 'G:/'
 PUBLISH_FOLDER = 'published'
 DEFAULT_PROJECT = 'EelCreek'
 
+import logging
+
+LOGGER = logging.getLogger(__name__)
+
 
 class VFXAssetManager(QtGui.QMainWindow): 
-    HOST = None
-    ACTIONS = []
+    HOST = None    
 
     def __init__(self, parent=None):
         super(VFXAssetManager, self).__init__(parent)
@@ -42,6 +48,8 @@ class VFXAssetManager(QtGui.QMainWindow):
                                   'project_pub_folder': '',
                                   'variant': '', 'variant_folder': '',
                                   'asset': '', 'asset_folder': ''}
+
+        self.ACTIONS = []
 
         # Main layout widgets
         main_widget = QtGui.QWidget()
@@ -67,11 +75,9 @@ class VFXAssetManager(QtGui.QMainWindow):
         self.assets.addWidget(QtGui.QLabel('Assets:'))
         self.asset_list_widget = self._list_widget(parent=self.assets)     
 
-        self.texture_widget = contact_sheet.QdContactSheet()
-        self.assets.addWidget(self.texture_widget)  
-        self.export_abc_button = QtGui.QPushButton('Export Alembic')
-        self.export_abc_button.clicked.connect(self.abc_export)
-        self.assets.addWidget(self.export_abc_button)
+        # self.texture_widget = contact_sheet.QdContactSheet()        
+        # self.assets.addWidget(self.texture_widget)  
+        self.actionbuttons = self._buttons_widget(parent=self.assets)
         self.path_layout = self._path_layout(parent=self.assets)     
 
         # Initial population
@@ -80,15 +86,6 @@ class VFXAssetManager(QtGui.QMainWindow):
 
         # Signal for project changes
         self.projects_combo.currentIndexChanged.connect(self._populate_variants)
-
-    def abc_import(self, item):
-        """
-        Imports an alembic file, action based on app context
-
-        Args:
-            item(Asset): pass in an Asset object
-        """
-        item.abc_import()
 
     def abc_export(self):
         """
@@ -148,11 +145,24 @@ class VFXAssetManager(QtGui.QMainWindow):
             if item.get_actions():
                 menu = QtGui.QMenu("Context Menu", self)
                 for action in item.get_actions():
-                    qaction = QtGui.QAction(action.NAME, 
-                                            self, 
-                                            triggered=lambda: action.execute(item.get_path()))
-                    menu.addAction(qaction)
+                    if action.ACTIONTYPE == ActionType.Menu:
+                        _partial = partial(action.execute, item.get_path())
+                        qaction = QtGui.QAction(action.NAME, 
+                                                self, 
+                                                triggered=_partial)
+                        menu.addAction(qaction)
                 ret = menu.exec_(self.asset_list_widget.mapToGlobal(QPos))
+
+    def add_buttons(self):
+        valid_actions = [a for a in self.ACTIONS if a.ACTIONTYPE == 2]
+        for action in valid_actions:
+            button = QtGui.QPushButton(action.NAME)
+            _partial = partial(self.get_path, action)
+            button.clicked.connect(_partial)
+            self.actionbuttons.addWidget(button)
+
+    def get_path(self, action):
+        action.execute(path=self.path_line.text())
 
     def get_projects(self, filepath):        
         projects = os.listdir(filepath)
@@ -248,6 +258,14 @@ class VFXAssetManager(QtGui.QMainWindow):
         parent.addWidget(list_widget)
 
         return list_widget
+
+    def _buttons_widget(self, parent):
+        button_widget = QtGui.QWidget()
+        button_vlayout = QtGui.QHBoxLayout(button_widget)
+        self._clean_layouts(button_vlayout)
+        parent.addWidget(button_widget)
+
+        return button_vlayout
 
     def _variant_layout(self):
         variant_widget = QtGui.QWidget()
@@ -352,15 +370,6 @@ class Asset(QtGui.QListWidgetItem):
     def add_actions(self, actions):
         self.ACTIONS = actions
 
-    # def abc_import(self):
-    #     if HostApp.in_maya():
-    #         import maya.cmds as cmds
-    #         cmds.AbcImport(str(self.get_path()))
-
-    #     if HostApp.in_clarisse():
-    #         import ix
-    #         ix.import_scene(str(self.get_path()))
-
 
 class HostApp(object):
     @staticmethod
@@ -412,10 +421,16 @@ def main(*args):
     except:
         pass
 
+    if not host:
+        LOGGER.warning('No HOST found.')
+        print 'No HOST found.'
+        return
+
     host.start_QApp()
     vfx_asset_manager = VFXAssetManager()
     vfx_asset_manager.HOST = host
     vfx_asset_manager.ACTIONS = actions
+    vfx_asset_manager.add_buttons()
     vfx_asset_manager.show()
 
     if HostApp.in_shell():
@@ -426,4 +441,7 @@ def main(*args):
 
 
 if __name__ == '__main__':
+    main()
+
+if __name__ == '__builtin__':
     main()

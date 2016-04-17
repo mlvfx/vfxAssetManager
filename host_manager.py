@@ -1,11 +1,10 @@
 import os
 import imp
-import sys
 
 PROJECT_FOLDER = os.path.dirname(__file__)
 
 
-def find_plugins(): 
+def find_plugins():
     plugins_folder = os.path.join(PROJECT_FOLDER, 'plugins').replace('\\', '/')
 
     if os.path.isdir(plugins_folder):
@@ -34,17 +33,20 @@ class HostManager(object):
 
                 if host_app.INHOST:
                     self.host_app = host_app
-                    action_path = os.path.join(p, 'actions.py').replace('\\', '/')
-                    name, ext = os.path.splitext(action_path)
 
-                    action = imp.load_source(name, action_path)
-                    self.host_actions = action.register_actions()
+                    try:
+                        action_path = os.path.join(p, 'actions.py').replace('\\', '/')
+                        name, ext = os.path.splitext(action_path)
+                        action = imp.load_source(name, action_path)
+                        self.host_actions = action.register_actions()
+                    except IOError:
+                        print 'HostManager:IOError -- No actions found'
 
             except IOError, ioe:
-                print 'IOError -- ', ioe
+                print 'HostManager:IOError -- ', ioe
 
             except ImportError, ime:
-                print 'ImportError -- ', ime
+                print 'HostManager:ImportError -- ', ime
 
     def get_hostapp(self):
         return self.host_app
