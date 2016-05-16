@@ -8,9 +8,10 @@ from PySide import QtGui
 
 class HostApp(BaseHost):
     ID = 'Clarisse'
+    FILETYPES = ['abc', 'png', 'tiff', 'vdb']
 
     def get_host(self):
-        return 'Clarisse' in sys.executable 
+        return 'Clarisse' in sys.executable
 
     def start_QApp(self):
         import pyqt_clarisse
@@ -20,4 +21,4 @@ class HostApp(BaseHost):
         except:
             app = QtGui.QApplication.instance()
 
-        pyqt_clarisse.exec_(app)    
+        pyqt_clarisse.exec_(app)

@@ -1,7 +1,7 @@
 """
 HOUDINI ACTIONS
 """
-from vfxAssetManager.base.action import BaseAction
+from vfxAssetManager.base.actions import BaseAction
 import os
 
 

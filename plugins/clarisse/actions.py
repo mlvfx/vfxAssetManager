@@ -1,4 +1,7 @@
-from vfxAssetManager.base.action import BaseAction
+"""
+CLARISSE ACTIONS
+"""
+from vfxAssetManager.base.actions import BaseAction
 import os
 
 
@@ -7,20 +10,22 @@ class AbcImport(BaseAction):
     FILETYPE = 'abc'
 
     def execute(self, path, **kwargs):
-        print path
         if self.valid_filetype(path):
             import ix
             ix.import_scene(str(path))
 
 
-class AbcReference(BaseAction):
-    NAME = 'ABC Reference'
-    FILETYPE = 'abc'
+class TextureImport(BaseAction):
+    NAME = 'PNG Import'
+    FILETYPE = 'png'
 
     def execute(self, path, **kwargs):
         if self.valid_filetype(path):
             import ix
-            ix.import_scene(str(path))
+            name, ext = os.path.splitext(os.path.basename(path))
+            texture_file = ix.create_object(str(name), 'TextureMapFile')
+            texture_file.get_attribute('filename').set_string(str(path))
+            print 'Created TextureMapFile: {0}'.format(name)
 
 
 class VdbImport(BaseAction):
@@ -34,4 +39,4 @@ class VdbImport(BaseAction):
 
 
 def register_actions(*args):
-    return [AbcImport(), AbcReference(), VdbImport()]
+    return [AbcImport(), TextureImport(), VdbImport()]

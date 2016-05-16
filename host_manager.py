@@ -1,5 +1,8 @@
 import os
 import imp
+from vfxAssetManager.base.host import BaseHost
+from vfxAssetManager.base import actions
+
 
 PROJECT_FOLDER = os.path.dirname(__file__)
 
@@ -19,9 +22,8 @@ class HostManager(object):
     def __init__(self):
         plugins = find_plugins()
         self.host_app = None
-        self.host_actions = []
-
-        # print plugins
+        self.host_actions = actions.register_actions()
+        self.host_filetypes = []
 
         for p in plugins:
             try:
@@ -33,12 +35,13 @@ class HostManager(object):
 
                 if host_app.INHOST:
                     self.host_app = host_app
+                    self.host_filetypes = self.host_app.FILETYPES
 
                     try:
                         action_path = os.path.join(p, 'actions.py').replace('\\', '/')
                         name, ext = os.path.splitext(action_path)
                         action = imp.load_source(name, action_path)
-                        self.host_actions = action.register_actions()
+                        self.host_actions += action.register_actions()
                     except IOError:
                         print 'HostManager:IOError -- No actions found'
 
@@ -49,7 +52,12 @@ class HostManager(object):
                 print 'HostManager:ImportError -- ', ime
 
     def get_hostapp(self):
+        if not self.host_app:
+            self.host_app = BaseHost()
         return self.host_app
 
     def get_actions(self):
         return self.host_actions
+
+    def get_filetypes(self):
+        return self.host_filetypes
